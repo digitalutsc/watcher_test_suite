@@ -1,0 +1,39 @@
+# Environment & Secrets
+.env
+.env.*
+!.env.example
+
+# Python Cache & Artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Virtual Environments
+venv/
+.venv/
+env/
+ENV/
+
+# Browser & Test Session Data
+browser_session_data/
+tmp/
+.playwright/
+test-results/
+
+# Outputs & Dynamic Results
+output/*
+!output/.gitkeep
+redirect_results.txt
+*.log
+
+# OS & Editor Files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+.vscode/
+.idea/
