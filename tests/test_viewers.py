@@ -13,16 +13,15 @@ from src.browser import BrowserManager
 
 csv_write_lock = asyncio.Lock()
 
+
 def get_dynamic_output_path():
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     return os.path.join(settings.VIEWERS_OUTPUT_DIR, f"test_viewers_output_{timestamp}.csv")
 
+
 # ---------------------------------------------------------------------------
 # Individual Viewer Validators
 # ---------------------------------------------------------------------------
-
-# tests/test_viewers.py (Excerpt: Enhanced Visual Validators)
-
 
 async def validate_mirador(page, worker_prefix):
     """Validates Mirador initialization, IIIF manifest connection, and canvas tile rendering."""
@@ -70,6 +69,7 @@ async def validate_mirador(page, worker_prefix):
 
     return True, f"Mirador rendering verified ({render_check['width']}x{render_check['height']}px canvas active)"
 
+
 async def validate_ableplayer(page, worker_prefix):
     """Validates AblePlayer container DOM presence, audio/video element attachment, and media stream loading state."""
     
@@ -95,12 +95,6 @@ async def validate_ableplayer(page, worker_prefix):
                 return { loaded: false, reason: "No native <video> or <audio> element found inside player" };
             }
 
-            // readyState values:
-            // 0 = HAVE_NOTHING
-            // 1 = HAVE_METADATA
-            // 2 = HAVE_CURRENT_DATA
-            // 3 = HAVE_FUTURE_DATA
-            // 4 = HAVE_ENOUGH_DATA
             const readyState = media.readyState;
             const networkState = media.networkState; // 3 = NETWORK_NO_SOURCE
 
@@ -108,7 +102,7 @@ async def validate_ableplayer(page, worker_prefix):
                 return { loaded: false, reason: "Media source error (networkState 3: NO_SOURCE / 404 asset)" };
             }
 
-            if (readyState >= 1) { // Metadata (duration, tracks, dimensions) loaded successfully
+            if (readyState >= 1) { // Metadata loaded successfully
                 return { 
                     loaded: true, 
                     src: media.currentSrc || media.src,
@@ -127,11 +121,72 @@ async def validate_ableplayer(page, worker_prefix):
     return True, f"AblePlayer verified active (Stream: {media_status.get('readyState')} readyState, Duration: {round(media_status.get('duration', 0), 1)}s)"
 
 
+async def validate_pdfjs(page, worker_prefix):
+    """Validates Drupal/Islandora PDF.js iframe wrapper and inner canvas rendering."""
+    
+    # 1. Locate the PDF.js iframe in the Drupal media block
+    print(f"   {worker_prefix} 1/3 Locating PDF.js iframe element...")
+    iframe_locator = page.locator("iframe.pdf, iframe[src*='pdf.js'], iframe[src*='viewer.html']").first
+    
+    try:
+        await iframe_locator.wait_for(state="attached", timeout=10000)
+    except Exception:
+        # Fallback check for non-iframe direct embeds
+        iframe_locator = page.locator("#viewer, .pdfViewer, embed[type='application/pdf']").first
+        try:
+            await iframe_locator.wait_for(state="attached", timeout=5000)
+        except Exception:
+            return False, "PDF.js iframe/container not found in DOM"
+
+    # 2. Get the Frame object inside the iframe
+    print(f"   {worker_prefix} 2/3 Accessing iframe content frame & page rendering layer...")
+    
+    # Obtain frame handle (or fallback to page if top-level)
+    frame_element = await iframe_locator.element_handle()
+    target_frame = await frame_element.content_frame() if frame_element else None
+    
+    # If no content_frame (e.g. cross-origin restriction or not an iframe), default to main page
+    if not target_frame:
+        target_frame = page
+
+    # Wait for PDF.js internal canvas or page container inside the iframe
+    canvas_locator = target_frame.locator("canvas, .page, #viewer .page, .pdfViewer .page").first
+    try:
+        await canvas_locator.wait_for(state="visible", timeout=20000)
+    except Exception:
+        return False, "PDF iframe found, but internal canvas/page layer failed to render within 20s"
+
+    # 3. Inspect canvas viewport dimensions inside the frame
+    print(f"   {worker_prefix} 3/3 Verifying rendered PDF page dimensions...")
+    render_check = await target_frame.evaluate("""
+        () => {
+            const elements = document.querySelectorAll('canvas, .page, embed');
+            if (elements.length === 0) return { success: false, reason: "No canvas/page elements found inside iframe" };
+
+            for (let el of elements) {
+                const rect = el.getBoundingClientRect();
+                if (rect.width > 50 && rect.height > 50) {
+                    return { 
+                        success: true, 
+                        width: Math.round(rect.width), 
+                        height: Math.round(rect.height) 
+                    };
+                }
+            }
+            return { success: false, reason: "PDF elements present inside iframe but have 0x0 dimensions" };
+        }
+    """)
+
+    if not render_check.get("success"):
+        return False, f"PDF.js rendering failed: {render_check.get('reason')}"
+
+    return True, f"PDF.js rendering verified ({render_check['width']}x{render_check['height']}px active in iframe)"
 
 # Dispatcher mapping normalized strings to functions
 VIEWER_DISPATCHER = {
     "mirador": validate_mirador,
-    "ableplayer": validate_ableplayer
+    "ableplayer": validate_ableplayer,
+    "pdfjs": validate_pdfjs
 }
 
 # ---------------------------------------------------------------------------
@@ -143,52 +198,54 @@ async def worker(worker_id, queue, context, output_file_path):
 
     while not queue.empty():
         idx, original_url, expected_viewer = await queue.get()
-        print(f"[Worker {worker_id}] [{idx}] Testing ({expected_viewer}): {original_url}")
+        worker_prefix = f"[Worker {worker_id}] [{idx}]"
+        print(f"{worker_prefix} Testing ({expected_viewer}): {original_url}")
 
         js_errors = []
         network_failures = []
 
-        # Listen for console JS uncaught errors
-        page.on("pageerror", lambda exc: js_errors.append(str(exc)))
-        
-        # Listen for failed critical network calls (4xx/5xx on manifests/media)
-        page.on("response", lambda resp: network_failures.append(resp.url) if resp.status >= 400 and resp.request.resource_type in ["fetch", "xhr", "media"] else None)
+        # 1. Capture uncaught JavaScript errors with full message
+        page.on("pageerror", lambda exc: js_errors.append(str(exc).split("\n")[0]))
+
+        # 2. Capture failed network responses with HTTP Status Code and Target URL
+        page.on(
+            "response",
+            lambda resp: network_failures.append(f"[{resp.status}] {resp.url}")
+            if resp.status >= 400 and resp.request.resource_type in ["fetch", "xhr", "media", "document", "other", "script", "stylesheet"]
+            else None
+        )
 
         test_status = "Failed"
         details = ""
 
-        # Inside worker() loop in tests/test_viewers.py:
         try:
             await page.goto(original_url, wait_until="domcontentloaded", timeout=30000)
-            await page.wait_for_timeout(2000)  # Allow JS player & media headers to initialize
+            await page.wait_for_timeout(2000)  # Allow JS viewer initialization
 
-            worker_prefix = f"[Worker {worker_id}] [{idx}]"
             viewer_key = expected_viewer.strip().lower()
 
-            if viewer_key == "ableplayer":
-                passed, msg = await validate_ableplayer(page, worker_prefix)
+            if viewer_key in VIEWER_DISPATCHER:
+                validator_func = VIEWER_DISPATCHER[viewer_key]
+                passed, msg = await validator_func(page, worker_prefix)
                 if passed:
                     test_status = "Passed"
                     details = msg
                 else:
                     test_status = "Failed (Rendering)"
                     details = msg
-            elif viewer_key == "mirador":
-                passed, msg = await validate_mirador(page, worker_prefix)
-                # ... mirador logic ...
             else:
                 test_status = "Skipped"
-                details = f"Skipping '{expected_viewer}'"
+                details = f"Skipping unsupported viewer: '{expected_viewer}'"
 
         except Exception as e:
             test_status = "Failed (Timeout/Error)"
-            details = str(e)
+            details = str(e).split("\n")[0]
 
-        # Append console or network diagnostic notes if applicable
+        # Append exact JS errors and failed network request URLs to details
         if js_errors:
-            details += f" | JS Errors Detected ({len(js_errors)})"
+            details += f" | JS Errors: {'; '.join(js_errors)}"
         if network_failures:
-            details += f" | Asset Requests Failed ({len(network_failures)})"
+            details += f" | Failed Assets: {'; '.join(network_failures)}"
 
         # Thread-safe writing
         async with csv_write_lock:
@@ -203,7 +260,7 @@ async def worker(worker_id, queue, context, output_file_path):
                     "Yes" if network_failures else "No"
                 ])
 
-        print(f"[Worker {worker_id}] [{idx}] Result: {test_status} | {details}")
+        print(f"{worker_prefix} Result: {test_status} | {details}")
         await asyncio.sleep(random.uniform(1.0, 2.0))
         queue.task_done()
 
@@ -262,3 +319,7 @@ async def run_viewer_tests():
 
     await browser_mgr.stop()
     print(f"\n✅ Viewer QA testing complete. Output saved to {output_file_path}.")
+
+
+if __name__ == "__main__":
+    asyncio.run(run_viewer_tests())

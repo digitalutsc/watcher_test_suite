@@ -21,7 +21,8 @@ tmp/
 .playwright/
 test-results/
 
-# Outputs & Dynamic Results
+# Input, Outputs & Dynamic Results
+data
 output/*
 !output/.gitkeep
 redirect_results.txt

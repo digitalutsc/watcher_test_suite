@@ -15,7 +15,7 @@ def get_dynamic_output_path():
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     return os.path.join(settings.OUTPUT_DIR, f"test_robots_output_{timestamp}.csv")
 
-def run_robots_tests():
+async def run_robots_tests():
     print("\n==========================================")
     print("🤖 Running Robots.txt Validation Suite")
     print("==========================================")

@@ -28,7 +28,7 @@ USER_AGENT = BROWSER_SETTINGS.get("user_agent", "")
 CONCURRENT_WORKERS = BROWSER_SETTINGS.get("concurrent_workers", 1)
 
 # Suite configs
-TEST_TO_RUN = _config.get("test_to_run", "test_viewers")
+TEST_TO_RUN = _config.get("test_to_run", ["test_viewers"])
 
 TEST_VIEWERS_CONFIG = _config.get("test_viewers", {})
 VIEWERS_INPUT_FILE = TEST_VIEWERS_CONFIG.get("input_file", "data/viewers.csv")
@@ -44,3 +44,15 @@ PERF_STRATEGY = TEST_PERF_CONFIG.get("strategy", "desktop")
 
 # 🔑 Read API Key exclusively from environment / .env file
 PERF_API_KEY = os.getenv("PAGESPEED_API_KEY", "")
+
+# --- Search Suite Configs ---
+TEST_SEARCH_CONFIG = _config.get("test_search", {})
+SEARCH_INPUT_FILE = TEST_SEARCH_CONFIG.get("input_file", "data/search.csv")
+SEARCH_OUTPUT_DIR = TEST_SEARCH_CONFIG.get("output_dir", "output")
+
+# --- SEO Configs ---
+TEST_ROBOTS_CONFIG = _config.get("test_robots", {})
+LOCAL_ROBOTS_PATH = TEST_ROBOTS_CONFIG.get("local_robots_path", "data/robots.txt")
+ROBOTS_URLS_FILE = TEST_ROBOTS_CONFIG.get("input_file", "data/urls.txt")
+ROBOTS_USER_AGENT = TEST_ROBOTS_CONFIG.get("user_agent", "Googlebot")
+OUTPUT_DIR = TEST_ROBOTS_CONFIG.get("output_dir", "output")

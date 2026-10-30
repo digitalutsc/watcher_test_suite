@@ -225,4 +225,7 @@ https://digital.utsc.utoronto.ca/
 https://digital.utsc.utoronto.ca/learning
 https://digital.utsc.utoronto.ca/search-results?a%5B0%5D%5Bf%5D=all&a%5B0%5D%5Bi%5D=IS&a%5B0%5D%5Bv%5D=
 https://digital.utsc.utoronto.ca/search-results
-
+https://doris.digital.utsc.utoronto.ca/index.php/61220/utsc76567?items_per_page=50&display=grid&f[0]=collection_member_geographic_subject:Alfriston&f[1]=collection_member_geographic_subject:East Sussex&f[2]=collection_member_geographic_subject:England&f[3]=collection_member_geographic_subject:Grand County&f[4]=collection_member_geographic_subject:New York&f[5]=collection_member_geographic_subject:Ottawa&f[6]=collection_member_geographic_subject:Toronto&f[7]=collection_member_geographic_subject:[Isfahan?]
+https://doris.digital.utsc.utoronto.ca/index.php/61220/utsc76567?items_per_page=50&display=grid&f[0]=collection_member_geographic_subject:Alfriston&f[1]=collection_member_geographic_subject:East Sussex&f[2]=collection_member_geographic_subject:England&f[3]=collection_member_geographic_subject:Lazio&f[4]=collection_member_geographic_subject:New York&f[5]=collection_member_geographic_subject:Ottawa
+https://ecn.digital.utsc.utoronto.ca/node/34651/book-manifest
+https://ecn.digital.utsc.utoronto.ca/node/37854/manifest

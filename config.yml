@@ -1,12 +1,12 @@
 test_to_run:
-  - "test_performance"
+  - "test_robots"
 
 browser_settings:
   headless: true
   viewport_width: 1280
   viewport_height: 800
   user_agent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
-  concurrent_workers: 5
+  concurrent_workers: 50
 
 test_ark:
   input_file: "data/Memory ARK binding - Copy of 1_ingest_identifiers.csv"
@@ -16,9 +16,10 @@ test_robots:
   local_robots_path: "data/robots.txt"
   input_file: "data/urls.txt"
   user_agent: "Googlebot"
+  output_dir: "output"
 
 test_viewers:
-  input_file: "data/ableplayer.csv"
+  input_file: "data/pdfjs.csv"
   output_dir: "output"
 
 test_performance:
@@ -26,3 +27,6 @@ test_performance:
   output_dir: "output"
   strategy: "desktop"  # "desktop" or "mobile"
 
+test_search:
+  input_file: "data/search.csv"
+  output_dir: "output"

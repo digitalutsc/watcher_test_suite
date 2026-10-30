@@ -62,7 +62,8 @@ Disallow: /en/performers?
 Disallow: /fr/performers?
 Disallow: /people?
 Disallow: /learning-objects-catalog?
-
+Disallow: /node/*/manifest
+Disallow: /node/*/book-manifest
 
 # Specific Endpoint Blocks
 Disallow: /oai/
